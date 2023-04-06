@@ -32,7 +32,8 @@ func TestProgressbarPrinter_Add_With(t *testing.T) {
 
 func TestProgressbarPrinter_AddWithNoStyle(t *testing.T) {
 	proxyToDevNull()
-	p := pterm.ProgressbarPrinter{}.WithTotal(2000)
+	p := &pterm.ProgressbarPrinter{}
+	p.WithTotal(2000)
 	p.Add(1337)
 	testza.AssertEqual(t, 1337, p.Current)
 	p.Stop()
@@ -40,7 +41,8 @@ func TestProgressbarPrinter_AddWithNoStyle(t *testing.T) {
 
 func TestProgressbarPrinter_AddWithTotalOfZero(t *testing.T) {
 	proxyToDevNull()
-	p := pterm.ProgressbarPrinter{}.WithTotal(0)
+	p := &pterm.ProgressbarPrinter{}
+	p.WithTotal(0)
 	p.Add(1337)
 	testza.AssertEqual(t, 0, p.Current)
 	p.Stop()
@@ -52,8 +54,9 @@ func TestProgressbarPrinter_AddTotalEqualsCurrent(t *testing.T) {
 	p.Start()
 	p.Add(1)
 	testza.AssertEqual(t, 1, p.Current)
-	testza.AssertFalse(t, p.IsActive)
+	testza.AssertTrue(t, p.IsActive)
 	p.Stop()
+	testza.AssertFalse(t, p.IsActive)
 }
 
 func TestProgressbarPrinter_RemoveWhenDone(t *testing.T) {
@@ -206,19 +209,20 @@ func TestProgressbarPrinter_WithBarFiller(t *testing.T) {
 
 func TestProgressbarPrinter_UpdateTitle(t *testing.T) {
 	p := pterm.ProgressbarPrinter{}
-	p2 := p.WithTitle("test")
-	p2.UpdateTitle("test2")
+	p.WithTitle("test")
+	p.UpdateTitle("test2")
 
-	testza.AssertEqual(t, "test2", p2.Title)
+	testza.AssertEqual(t, "test2", p.Title)
 }
 
 func TestProgressbarPrinter_WithWriter(t *testing.T) {
-	p := pterm.ProgressbarPrinter{}
+	p := &pterm.ProgressbarPrinter{}
 	s := os.Stderr
-	p2 := p.WithWriter(s)
+	p.WithWriter(s)
+	p2 := &pterm.ProgressbarPrinter{}
 
-	testza.AssertEqual(t, s, p2.Writer)
-	testza.AssertZero(t, p.Writer)
+	testza.AssertEqual(t, s, p.Writer)
+	testza.AssertZero(t, p2.Writer)
 }
 
 func TestProgressbarPrinter_OutputToWriters(t *testing.T) {
@@ -237,11 +241,11 @@ func TestProgressbarPrinter_OutputToWriters(t *testing.T) {
 	for testTitle, testCase := range testCases {
 		t.Run(testTitle, func(t *testing.T) {
 			stderr, err := testza.CaptureStderr(func(w io.Writer) error {
-				pb, err := pterm.DefaultProgressbar.WithTitle("Hello world").WithWriter(os.Stderr).Start()
-				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isnt outputted
+				pb, err := pterm.DefaultProgressbar.WithShowTitle(true).WithTitle("Hello world").WithWriter(os.Stderr).Start()
 				testza.AssertNoError(t, err)
+				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isn't outputted
 				testCase.action(pb)
-				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isnt updated
+				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isn't updated
 				return nil
 			})
 
