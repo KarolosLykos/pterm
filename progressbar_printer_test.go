@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MarvinJWendt/testza"
+
 	"github.com/pterm/pterm"
 )
 
@@ -23,7 +24,8 @@ func TestProgressbarPrinter_Add_With(t *testing.T) {
 	w := pterm.GetTerminalWidth()
 	h := pterm.GetTerminalHeight()
 	pterm.SetForcedTerminalSize(1, 1)
-	p := pterm.DefaultProgressbar.WithTotal(2000)
+	p := &pterm.ProgressbarPrinter{}
+	p.WithTotal(2000)
 	p.Add(1337)
 	testza.AssertEqual(t, 1337, p.Current)
 	p.Stop()
@@ -61,7 +63,8 @@ func TestProgressbarPrinter_AddTotalEqualsCurrent(t *testing.T) {
 
 func TestProgressbarPrinter_RemoveWhenDone(t *testing.T) {
 	proxyToDevNull()
-	p, err := pterm.DefaultProgressbar.WithTotal(2).WithRemoveWhenDone().Start()
+	p := &pterm.ProgressbarPrinter{}
+	p, err := p.WithTotal(2).WithRemoveWhenDone().Start()
 	testza.AssertNoError(t, err)
 	p.Stop()
 	p.Add(1)
@@ -95,7 +98,8 @@ func TestProgressbarPrinter_GetElapsedTime(t *testing.T) {
 }
 
 func TestProgressbarPrinter_Increment(t *testing.T) {
-	p := pterm.DefaultProgressbar.WithTotal(2000)
+	p := pterm.ProgressbarPrinter{}
+	p.WithTotal(2000)
 	p.Increment()
 	testza.AssertEqual(t, 1, p.Current)
 }
@@ -243,9 +247,9 @@ func TestProgressbarPrinter_OutputToWriters(t *testing.T) {
 			stderr, err := testza.CaptureStderr(func(w io.Writer) error {
 				pb, err := pterm.DefaultProgressbar.WithShowTitle(true).WithTitle("Hello world").WithWriter(os.Stderr).Start()
 				testza.AssertNoError(t, err)
-				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isn't outputted
+				time.Sleep(time.Millisecond) // Required otherwise the goroutine doesn't run and the text isn't outputted.
 				testCase.action(pb)
-				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isn't updated
+				time.Sleep(time.Millisecond) // Required otherwise the goroutine doesn't run and the text isn't updated.
 				return nil
 			})
 
