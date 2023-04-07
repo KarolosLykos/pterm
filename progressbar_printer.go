@@ -4,7 +4,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gookit/color"
@@ -22,6 +21,7 @@ var (
 		Total:                     100,
 		BarCharacter:              "█",
 		LastCharacter:             "█",
+		Delay:                     time.Millisecond * 200,
 		ElapsedTimeRoundingFactor: time.Second,
 		BarStyle:                  &ThemeDefault.ProgressbarBarStyle,
 		TitleStyle:                &ThemeDefault.ProgressbarTitleStyle,
@@ -31,7 +31,6 @@ var (
 		ShowElapsedTime:           true,
 		BarFiller:                 " ",
 		MaxWidth:                  80,
-		mu:                        &sync.Mutex{},
 	}
 )
 
@@ -40,6 +39,7 @@ type ProgressbarPrinter struct {
 	Title                     string
 	Total                     int
 	Current                   int
+	Delay                     time.Duration
 	BarCharacter              string
 	LastCharacter             string
 	ElapsedTimeRoundingFactor time.Duration
@@ -60,8 +60,6 @@ type ProgressbarPrinter struct {
 	startedAt time.Time
 
 	Writer io.Writer
-
-	mu *sync.Mutex
 }
 
 // WithTitle sets the name of the ProgressbarPrinter.
@@ -87,6 +85,12 @@ func (p *ProgressbarPrinter) WithTotal(total int) *ProgressbarPrinter {
 // WithCurrent sets the current value of the ProgressbarPrinter.
 func (p *ProgressbarPrinter) WithCurrent(current int) *ProgressbarPrinter {
 	p.Current = current
+	return p
+}
+
+// WithDelay add a delay to the ProgressbarPrinter.
+func (p *ProgressbarPrinter) WithDelay(delay time.Duration) *ProgressbarPrinter {
+	p.Delay = delay
 	return p
 }
 
@@ -174,79 +178,6 @@ func (p *ProgressbarPrinter) UpdateTitle(title string) *ProgressbarPrinter {
 	return p
 }
 
-// This is the update logic, renders the progressbar
-func (p *ProgressbarPrinter) updateProgress() *ProgressbarPrinter {
-	for p.IsActive {
-		if p.TitleStyle == nil {
-			p.TitleStyle = NewStyle()
-		}
-		if p.BarStyle == nil {
-			p.BarStyle = NewStyle()
-		}
-		if p.Total == 0 {
-			return nil
-		}
-
-		var before string
-		var after string
-		var width int
-
-		if p.MaxWidth <= 0 {
-			width = GetTerminalWidth()
-		} else if GetTerminalWidth() < p.MaxWidth {
-			width = GetTerminalWidth()
-		} else {
-			width = p.MaxWidth
-		}
-
-		currentPercentage := int(internal.PercentageRound(float64(int64(p.Total)), float64(int64(p.Current))))
-		decoratorCount := Gray("[") + LightWhite(p.Current) + Gray("/") + LightWhite(p.Total) + Gray("]")
-
-		decoratorCurrentPercentage := color.RGB(NewRGB(255, 0, 0).Fade(0, float32(p.Total), float32(p.Current), NewRGB(0, 255, 0)).GetValues()).
-			Sprint(strconv.Itoa(currentPercentage) + "%")
-
-		decoratorTitle := p.TitleStyle.Sprint(p.Title)
-
-		if p.ShowTitle {
-			before += decoratorTitle + " "
-		}
-		if p.ShowCount {
-			before += decoratorCount + " "
-		}
-
-		after += " "
-
-		if p.ShowPercentage {
-			after += decoratorCurrentPercentage + " "
-		}
-		if p.ShowElapsedTime {
-			after += "| " + p.parseElapsedTime()
-		}
-
-		barMaxLength := width - len(RemoveColorFromString(before)) - len(RemoveColorFromString(after)) - 1
-
-		barCurrentLength := (p.Current * barMaxLength) / p.Total
-		var barFiller string
-		if barMaxLength-barCurrentLength > 0 {
-			barFiller = strings.Repeat(p.BarFiller, barMaxLength-barCurrentLength)
-		}
-
-		var bar string
-		if barCurrentLength > 0 {
-			bar = p.BarStyle.Sprint(strings.Repeat(p.BarCharacter, barCurrentLength)+p.LastCharacter) + barFiller
-		} else {
-			bar = ""
-		}
-
-		if !RawOutput {
-			fClearLine(p.Writer)
-			Fprinto(p.Writer, before+bar+after)
-		}
-	}
-
-	return p
-}
-
 // Add to current value.
 func (p *ProgressbarPrinter) Add(count int) *ProgressbarPrinter {
 	if p.Total == 0 {
@@ -274,7 +205,76 @@ func (p *ProgressbarPrinter) Start(title ...interface{}) (*ProgressbarPrinter, e
 	ActiveProgressBarPrinters = append(ActiveProgressBarPrinters, p)
 	p.startedAt = time.Now()
 
-	go p.updateProgress()
+	go func() {
+		for p.IsActive {
+			if p.TitleStyle == nil {
+				p.TitleStyle = NewStyle()
+			}
+			if p.BarStyle == nil {
+				p.BarStyle = NewStyle()
+			}
+			if p.Total == 0 {
+				continue
+			}
+
+			var before string
+			var after string
+			var width int
+
+			if p.MaxWidth <= 0 {
+				width = GetTerminalWidth()
+			} else if GetTerminalWidth() < p.MaxWidth {
+				width = GetTerminalWidth()
+			} else {
+				width = p.MaxWidth
+			}
+
+			currentPercentage := int(internal.PercentageRound(float64(int64(p.Total)), float64(int64(p.Current))))
+			decoratorCount := Gray("[") + LightWhite(p.Current) + Gray("/") + LightWhite(p.Total) + Gray("]")
+
+			decoratorCurrentPercentage := color.RGB(NewRGB(255, 0, 0).Fade(0, float32(p.Total), float32(p.Current), NewRGB(0, 255, 0)).GetValues()).
+				Sprint(strconv.Itoa(currentPercentage) + "%")
+
+			decoratorTitle := p.TitleStyle.Sprint(p.Title)
+
+			if p.ShowTitle {
+				before += decoratorTitle + " "
+			}
+			if p.ShowCount {
+				before += decoratorCount + " "
+			}
+
+			after += " "
+
+			if p.ShowPercentage {
+				after += decoratorCurrentPercentage + " "
+			}
+			if p.ShowElapsedTime {
+				after += "| " + p.parseElapsedTime()
+			}
+
+			barMaxLength := width - len(RemoveColorFromString(before)) - len(RemoveColorFromString(after)) - 1
+
+			barCurrentLength := (p.Current * barMaxLength) / p.Total
+			var barFiller string
+			if barMaxLength-barCurrentLength > 0 {
+				barFiller = strings.Repeat(p.BarFiller, barMaxLength-barCurrentLength)
+			}
+
+			var bar string
+			if barCurrentLength > 0 {
+				bar = p.BarStyle.Sprint(strings.Repeat(p.BarCharacter, barCurrentLength)+p.LastCharacter) + barFiller
+			} else {
+				bar = ""
+			}
+
+			if !RawOutput {
+				fClearLine(p.Writer)
+				Fprinto(p.Writer, before+bar+after)
+				time.Sleep(p.Delay)
+			}
+		}
+	}()
 
 	return p, nil
 }

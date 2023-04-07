@@ -119,6 +119,13 @@ func TestProgressbarPrinter_WithCurrent(t *testing.T) {
 	testza.AssertEqual(t, 10, p2.Current)
 }
 
+func TestProgressbarPrinter_WithDelay(t *testing.T) {
+	p := pterm.ProgressbarPrinter{}
+	p.WithDelay(1 * time.Second)
+
+	testza.AssertEqual(t, 1*time.Second, p.Delay)
+}
+
 func TestProgressbarPrinter_WithElapsedTimeRoundingFactor(t *testing.T) {
 	p := pterm.ProgressbarPrinter{}
 	p2 := p.WithElapsedTimeRoundingFactor(time.Hour)
@@ -247,9 +254,9 @@ func TestProgressbarPrinter_OutputToWriters(t *testing.T) {
 			stderr, err := testza.CaptureStderr(func(w io.Writer) error {
 				pb, err := pterm.DefaultProgressbar.WithShowTitle(true).WithTitle("Hello world").WithWriter(os.Stderr).Start()
 				testza.AssertNoError(t, err)
-				time.Sleep(time.Millisecond) // Required otherwise the goroutine doesn't run and the text isn't outputted.
+				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isn't outputted.
 				testCase.action(pb)
-				time.Sleep(time.Millisecond) // Required otherwise the goroutine doesn't run and the text isn't updated.
+				time.Sleep(time.Second) // Required otherwise the goroutine doesn't run and the text isn't updated.
 				return nil
 			})
 
